@@ -55,7 +55,17 @@ class Session:
 
 async def handler(ws: ServerConnection) -> None:
     session = Session(ws)
-    await session.send(make_hud(HudState.idle).to_json())
+    try:
+        await session.send(make_hud(HudState.idle).to_json())
+    except Exception:
+        return
+    try:
+        await _loop(session, ws)
+    except Exception:
+        return
+
+
+async def _loop(session: Session, ws: ServerConnection) -> None:
     async for raw in ws:
         text = raw if isinstance(raw, str) else raw.decode()
         data = json.loads(text)

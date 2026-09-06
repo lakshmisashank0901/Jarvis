@@ -42,6 +42,23 @@ def test_memory_remember_and_search() -> None:
     assert any("dentist" in f for f in hits["facts"])
 
 
+def test_act_uses_last_opened_app(monkeypatch) -> None:
+    seen: dict[str, object] = {}
+
+    def fake_act(text: str, app: str | None = None) -> dict:
+        seen["text"] = text
+        seen["app"] = app
+        return {"ok": True, "text": text, "app": app}
+
+    monkeypatch.setattr("jarvis_mcp.ax.act", fake_act)
+    host = FakeHost()
+    mcp = JarvisMcp(store=Store(), host=host)  # type: ignore[arg-type]
+    mcp.call("desktop", {"action": "open", "name": "WhatsApp"})
+    out = mcp.call("desktop", {"action": "act", "text": "Sunny", "irreversible": False})
+    assert out["ok"] is True
+    assert seen == {"text": "Sunny", "app": "WhatsApp"}
+
+
 def test_unknown_tool_rejected() -> None:
     mcp = JarvisMcp(store=Store(), host=FakeHost())  # type: ignore[arg-type]
     try:

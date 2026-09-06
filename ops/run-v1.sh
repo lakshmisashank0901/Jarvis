@@ -2,6 +2,11 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 export JARVIS_LLM="${JARVIS_LLM:-echo}"
+export PYTHONPATH="$PWD/brain:$PWD/jarvisd:$PWD/mcp:$PWD/memory${PYTHONPATH:+:$PYTHONPATH}"
+if [[ ! -x .venv/bin/python ]]; then
+  echo "run: uv sync --all-packages" >&2
+  exit 1
+fi
 .venv/bin/python -m brain.server &
 brain_pid=$!
 sleep 0.4

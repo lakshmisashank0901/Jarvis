@@ -16,6 +16,13 @@ struct HUDState: Codable, Sendable, Equatable {
     var partial: String?
     var confirm: HUDConfirm?
 
+    init(t: String = "hud", state: HUDPhase, partial: String? = nil, confirm: HUDConfirm? = nil) {
+        self.t = t
+        self.state = state
+        self.partial = partial
+        self.confirm = confirm
+    }
+
     init(from decoder: Decoder) throws {
         let box = try decoder.container(keyedBy: CodingKeys.self)
         t = try box.decodeIfPresent(String.self, forKey: .t) ?? "hud"

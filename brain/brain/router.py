@@ -13,6 +13,84 @@ class ToolCall:
 
 
 _URL = re.compile(r"https?://\S+", re.I)
+_STEP = re.compile(
+    r"\s*;\s*|\s+(?:and then|then|and|also|plus)\s+|\s*,\s+|\.\s+",
+    re.I,
+)
+_CMD_PREFIXES = (
+    "open ",
+    "close ",
+    "quit ",
+    "focus ",
+    "click ",
+    "go to ",
+    "set ",
+    "mute",
+    "lock",
+    "sleep",
+    "reveal ",
+    "remember ",
+    "search ",
+    "book ",
+    "create ",
+    "change ",
+    "update ",
+    "reschedule ",
+    "what's ",
+    "whats ",
+    "what is ",
+    "what time",
+    "when is ",
+)
+
+
+def _looks_command(part: str) -> bool:
+    low = part.lower().strip()
+    if not low:
+        return False
+    if _is_clock(low) or _is_browser(low) or _is_calendar(low) or _is_memory(low):
+        return True
+    if "on this screen" in low:
+        return True
+    if "volume" in low:
+        return True
+    return any(low.startswith(p) for p in _CMD_PREFIXES)
+
+
+def _as_open(part: str) -> ToolCall:
+    name = part.strip()
+    if name.lower().startswith("the "):
+        name = name[4:]
+    return ToolCall("desktop", {"action": "open", "name": name})
+
+
+def _clauses(text: str) -> list[str]:
+    bits = [p.strip(" \t.") for p in _STEP.split(text.strip()) if p.strip(" \t.")]
+    if not bits:
+        return [text.strip()]
+    merged = [bits[0]]
+    for bit in bits[1:]:
+        if _looks_command(bit):
+            merged.append(bit)
+        else:
+            merged[-1] = f"{merged[-1]} {bit}"
+    return merged
+
+
+def route_steps(text: str) -> list[ToolCall]:
+    raw = text.strip()
+    parts = _clauses(raw)
+    if len(parts) <= 1:
+        return [route(raw)]
+    calls: list[ToolCall] = []
+    for i, part in enumerate(parts):
+        if _looks_command(part):
+            calls.append(route(part))
+        elif i > 0:
+            calls.append(_as_open(part))
+        else:
+            calls.append(route(part))
+    return calls
 
 
 def route(text: str) -> ToolCall:
@@ -21,7 +99,7 @@ def route(text: str) -> ToolCall:
 
     if _is_browser(low):
         return _browser(raw, low)
-    if low.startswith("focus ") or low.startswith("quit ") or low.startswith("open "):
+    if low.startswith("focus ") or low.startswith("quit ") or low.startswith("close ") or low.startswith("open "):
         return _desktop(raw, low)
     if _is_calendar(low):
         return _calendar(raw, low)
@@ -125,20 +203,58 @@ def _desktop(raw: str, low: str) -> ToolCall:
         return ToolCall("desktop", {"action": "lock", "confirm_text": "Lock the Mac"})
     if low.startswith("sleep"):
         return ToolCall("desktop", {"action": "sleep", "confirm_text": "Sleep the Mac"})
-    if low.startswith("quit "):
-        return ToolCall("desktop", {"action": "quit", "name": raw[5:].strip(), "confirm_text": raw})
+    if low.startswith("quit ") or low.startswith("close "):
+        name = raw.split(" ", 1)[1].strip()
+        if name.lower().startswith("the "):
+            name = name[4:]
+        return ToolCall("desktop", {"action": "quit", "name": name, "confirm_text": raw})
     if low.startswith("focus "):
         return ToolCall("desktop", {"action": "focus", "name": raw[6:].strip()})
+    if _is_clock(low):
+        return ToolCall("desktop", {"action": "clock"})
     if "on this screen" in low or "what's on" in low and "calendar" not in low:
         return ToolCall("desktop", {"action": "inspect"})
     if low.startswith("click "):
-        return ToolCall("desktop", {"action": "act", "text": raw[6:].strip(), "irreversible": False})
+        return ToolCall("desktop", {"action": "act", "text": _click_text(raw), "irreversible": False})
     if low.startswith("open "):
         name = raw[5:].strip()
         if name.lower().startswith("the "):
             name = name[4:]
         return ToolCall("desktop", {"action": "open", "name": name})
     return ToolCall("desktop", {"action": "inspect"})
+
+
+def _click_text(raw: str) -> str:
+    text = raw[6:].strip() if raw.lower().startswith("click ") else raw.strip()
+    while True:
+        low = text.lower()
+        for prefix in ("on ", "the ", "contact ", "chat "):
+            if low.startswith(prefix):
+                text = text[len(prefix) :].strip()
+                break
+        else:
+            return text
+
+
+def _is_clock(low: str) -> bool:
+    stripped = low.strip(" ?.")
+    if stripped in {
+        "what is the time",
+        "what's the time",
+        "whats the time",
+        "what time is it",
+        "what's the date",
+        "what is the date",
+        "whats the date",
+        "what day is it",
+        "current time",
+        "time",
+        "date",
+        "what's today's date",
+        "what is today's date",
+    }:
+        return True
+    return "what time" in stripped or stripped.endswith(" the time")
 
 
 def _after(low: str, word: str) -> str:

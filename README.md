@@ -39,13 +39,14 @@ curl -s http://127.0.0.1:8742/v1/chat/completions \
   -d '{"messages":[{"role":"user","content":"Open Safari"}],"stream":false}'
 ```
 
-## Menu-bar HUD
+## App window
 
 ```bash
-cd app && swift run Jarvis
+# keep ./ops/run-v1.sh running, then:
+cd ~/Desktop/Jarvis/app && swift run Jarvis
 ```
 
-Hotkeys: ⌥⌘Space (PTT) · ⌥⌘Esc (cancel). Sign with Developer ID before putting it in `/Applications`.
+Type in the Jarvis window. Green = brain connected. No microphone yet.
 
 ## Models
 

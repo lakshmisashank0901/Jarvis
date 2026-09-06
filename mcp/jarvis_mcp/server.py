@@ -17,6 +17,7 @@ class JarvisMcp:
         self.store = store or Store()
         self.host = host or HostClient()
         self.last_confirm: dict[str, Any] | None = None
+        self.last_app: str | None = None
 
     def tools(self) -> list[str]:
         return list(TOOL_NAMES)
@@ -69,6 +70,11 @@ class JarvisMcp:
         gate = self._needs_confirm("desktop", action, arguments)
         if gate:
             return gate
+        if action == "clock":
+            from datetime import datetime
+
+            now = datetime.now()
+            return {"ok": True, "now": now.strftime("%-I:%M %p on %A, %-d %B")}
         if action == "inspect":
             from jarvis_mcp.ax import inspect
 
@@ -76,7 +82,8 @@ class JarvisMcp:
         if action == "act":
             from jarvis_mcp.ax import act
 
-            return act(str(arguments.get("text") or arguments.get("name") or "OK"))
+            label = str(arguments.get("text") or arguments.get("name") or "OK")
+            return act(label, app=self.last_app)
         op = {
             "open": "app.open",
             "quit": "app.quit",
@@ -92,9 +99,14 @@ class JarvisMcp:
             raise ValueError(f"unknown desktop action {action}")
         fields = {k: v for k, v in arguments.items() if k not in {"action", "confirmed", "confirm_text", "irreversible"}}
         try:
-            return self.host.call(op, **fields)
+            result = self.host.call(op, **fields)
         except HostError as exc:
             return {"ok": False, "error": str(exc)}
+        if action in {"open", "focus"} and result.get("ok"):
+            name = fields.get("name") or fields.get("bundle_id")
+            if name:
+                self.last_app = str(name)
+        return result
 
     def _browser(self, action: str | None, arguments: dict[str, Any]) -> dict[str, Any]:
         from jarvis_mcp import browser as web

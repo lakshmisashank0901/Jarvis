@@ -26,7 +26,7 @@ final class HUDPanel {
         panel.titlebarAppearsTransparent = true
         panel.backgroundColor = NSColor.black.withAlphaComponent(0.72)
         panel.contentView = hosting
-        panel.orderFrontRegardless()
+        panel.orderOut(nil)
     }
 
     func apply(_ state: HUDState) {
@@ -61,7 +61,7 @@ struct HUDView: View {
             Text((model.state?.state.rawValue ?? "idle").uppercased())
                 .font(.system(size: 11, weight: .semibold, design: .monospaced))
                 .foregroundStyle(.white.opacity(0.7))
-            Text(model.confirmText ?? model.state?.partial ?? "Jarvis")
+            Text(model.confirmText ?? model.state?.partial ?? "Click the menu-bar waveform → Ping HUD")
                 .font(.system(size: 16, weight: .medium))
                 .foregroundStyle(.white)
                 .lineLimit(2)

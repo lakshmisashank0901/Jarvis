@@ -8,18 +8,15 @@ final class HostSocket: @unchecked Sendable {
     private let files = FileHost()
     private let system = SystemHost()
     private let calendar = CalendarStore()
-    private var listener: NWListener?
+    private var unix: UnixJSONServer?
 
     func start() throws {
         try? FileManager.default.removeItem(atPath: Self.path)
-        let params = NWParameters()
-        params.defaultProtocolStack.transportProtocol = NWProtocolTCP.Options()
-        let listener = try NWListener(using: .tcp, on: NWEndpoint.Port(integerLiteral: 0))
-        // Prefer unix domain via FileHandle accept loop — Network.framework unix varies by OS.
-        self.listener = listener
-        UnixJSONServer(path: Self.path) { [weak self] req in
+        let server = UnixJSONServer(path: Self.path) { [weak self] req in
             self?.handle(req) ?? ["ok": false, "error": "dead"]
-        }.start()
+        }
+        server.start()
+        unix = server
     }
 
     func handle(_ req: [String: Any]) -> [String: Any] {
@@ -29,7 +26,7 @@ final class HostSocket: @unchecked Sendable {
             case "app.open":
                 return try launcher.open(name: req["name"] as? String, bundleId: req["bundle_id"] as? String)
             case "app.quit":
-                return try launcher.quit(bundleId: req["bundle_id"] as? String ?? "")
+                return try launcher.quit(name: req["name"] as? String, bundleId: req["bundle_id"] as? String)
             case "app.focus":
                 return try launcher.focus(name: req["name"] as? String, bundleId: req["bundle_id"] as? String)
             case "files.open":
@@ -90,9 +87,17 @@ final class UnixJSONServer: @unchecked Sendable {
         src.setEventHandler { [handler] in
             let client = accept(fd, nil, nil)
             guard client >= 0 else { return }
-            var buf = [UInt8](repeating: 0, count: 16_384)
-            let n = read(client, &buf, buf.count)
-            guard n > 0, let line = String(bytes: buf[0..<n], encoding: .utf8) else {
+            var collected = Data()
+            var buf = [UInt8](repeating: 0, count: 4096)
+            for _ in 0..<40 {
+                let n = read(client, &buf, buf.count)
+                if n > 0 { collected.append(contentsOf: buf[0..<n]) }
+                if collected.contains(0x0A) { break }
+                if n == 0 { usleep(20_000) }
+            }
+            guard !collected.isEmpty, let line = String(data: collected, encoding: .utf8) else {
+                let fallback = Data("{\"ok\":false,\"error\":\"empty request\"}\n".utf8)
+                _ = fallback.withUnsafeBytes { write(client, $0.baseAddress, fallback.count) }
                 close(client)
                 return
             }

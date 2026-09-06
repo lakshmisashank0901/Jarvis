@@ -1,11 +1,13 @@
 # Jarvis.app
 
 ```bash
-cd app
-swift build --product Jarvis
-swift run Jarvis
+# Terminal 1
+cd ~/Desktop/Jarvis && ./ops/run-v1.sh
+
+# Terminal 2
+cd ~/Desktop/Jarvis/app && swift run Jarvis
 ```
 
-Needs `./ops/run-v1.sh` first. Bundle id `com.jarvis.app`. Unsandboxed. Entitlements in `Signing/entitlements.plist`. Do not enable App Sandbox.
+A Jarvis **window** opens. Type a command, press Return or Ask. Green dot = brain is up.
 
-Hotkeys: ⌥⌘Space push-to-talk, ⌥⌘Esc cancel.
+Hotkeys: ⌥⌘J (status ping), ⌥⌘Esc cancel. macOS owns ⌥⌘Space (Finder search). No microphone yet.

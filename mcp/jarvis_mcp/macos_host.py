@@ -24,8 +24,14 @@ def dispatch(op: str, **fields: Any) -> dict[str, Any]:
         return {"ok": True, "name": str(name)}
     if op == "app.quit":
         target = fields.get("name") or fields.get("bundle_id")
+        if not target:
+            return {"ok": False, "error": "name required"}
         proc = _osa(f'tell application "{target}" to quit')
-        return {"ok": proc.returncode == 0, "error": proc.stderr.strip() or None}
+        if proc.returncode != 0:
+            proc = _osa(
+                f'tell application "System Events" to tell process "{target}" to quit'
+            )
+        return {"ok": proc.returncode == 0, "name": str(target), "error": proc.stderr.strip() or None}
     if op == "app.focus":
         target = fields.get("name") or fields.get("bundle_id")
         proc = _osa(f'tell application "{target}" to activate')

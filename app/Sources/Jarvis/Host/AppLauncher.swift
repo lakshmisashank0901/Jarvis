@@ -4,13 +4,25 @@ struct AppLauncher {
     func resolve(name: String?, bundleId: String?) -> String? {
         if let bundleId, !bundleId.isEmpty { return bundleId }
         guard let name, !name.isEmpty else { return nil }
-        if name.caseInsensitiveCompare("Safari") == .orderedSame { return "com.apple.Safari" }
-        if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: name) {
-            return Bundle(url: url)?.bundleIdentifier
+        let cleaned = name.hasSuffix(".app") ? String(name.dropLast(4)) : name
+        if cleaned.caseInsensitiveCompare("Safari") == .orderedSame { return "com.apple.Safari" }
+        if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: cleaned) {
+            return Bundle(url: url)?.bundleIdentifier ?? cleaned
         }
-        let appName = name.hasSuffix(".app") ? name : "\(name).app"
-        let url = URL(fileURLWithPath: "/Applications/\(appName)")
-        return Bundle(url: url)?.bundleIdentifier
+        let appName = "\(cleaned).app"
+        let dirs = [
+            "/Applications",
+            "/System/Applications",
+            "/System/Applications/Utilities",
+            NSHomeDirectory() + "/Applications",
+        ]
+        for dir in dirs {
+            let url = URL(fileURLWithPath: dir).appendingPathComponent(appName)
+            if let id = Bundle(url: url)?.bundleIdentifier { return id }
+        }
+        return NSWorkspace.shared.runningApplications.first {
+            $0.localizedName?.caseInsensitiveCompare(cleaned) == .orderedSame
+        }?.bundleIdentifier
     }
 
     func open(name: String?, bundleId: String?) throws -> [String: Any] {
@@ -22,10 +34,16 @@ struct AppLauncher {
         return ["ok": true, "bundle_id": id]
     }
 
-    func quit(bundleId: String) throws -> [String: Any] {
-        let apps = NSRunningApplication.runningApplications(withBundleIdentifier: bundleId)
+    func quit(name: String?, bundleId: String?) throws -> [String: Any] {
+        guard let id = resolve(name: name, bundleId: bundleId) else {
+            throw NSError(domain: "jarvis", code: 1, userInfo: [NSLocalizedDescriptionKey: "app not found"])
+        }
+        let apps = NSRunningApplication.runningApplications(withBundleIdentifier: id)
+        guard !apps.isEmpty else {
+            throw NSError(domain: "jarvis", code: 2, userInfo: [NSLocalizedDescriptionKey: "app not running"])
+        }
         apps.forEach { $0.terminate() }
-        return ["ok": true, "bundle_id": bundleId]
+        return ["ok": true, "bundle_id": id, "name": name ?? id]
     }
 
     func focus(name: String?, bundleId: String?) throws -> [String: Any] {
