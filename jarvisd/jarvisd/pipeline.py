@@ -8,7 +8,7 @@ from typing import Any
 
 from jarvisd.brain_client import BrainClient
 from jarvisd.tts_clause import ClauseTts
-from jarvisd.ws import STAGE_NAMES, HudState, make_hud, make_stage
+from jarvisd.ws import STAGE_NAMES, Confirm, HudState, make_hud, make_stage
 
 EOT_SILENCE_MS = 200
 
@@ -34,6 +34,8 @@ async def run_text_turn(
     brain: BrainClient,
     tts: ClauseTts,
     emit: Callable[[dict[str, Any]], None],
+    *,
+    confirmed: bool = False,
 ) -> dict[str, float]:
     timer = StageTimer()
     t0 = time.perf_counter()
@@ -50,10 +52,24 @@ async def run_text_turn(
 
     reply_parts: list[str] = []
     first_clause = True
-    async for kind, payload in brain.stream_chat(transcript):
+    pending: dict[str, Any] | None = None
+    async for kind, payload in brain.stream_chat(transcript, confirmed=confirmed):
         if kind == "ttft":
             timer.marks["llm_ttft"] = float(payload)
             emit(make_stage("llm_ttft", timer.marks["llm_ttft"]).to_json())
+        elif kind == "confirm":
+            pending = json.loads(str(payload))
+            emit(
+                make_hud(
+                    HudState.confirm,
+                    partial=str(pending.get("text")),
+                    confirm=Confirm(
+                        id=str(pending.get("id", "pending")),
+                        text=str(pending.get("text", "")),
+                        deadline_ms=int(pending.get("deadline_ms", 3000)),
+                    ),
+                ).to_json()
+            )
         elif kind == "clause":
             if first_clause:
                 c0 = time.perf_counter()
@@ -72,7 +88,9 @@ async def run_text_turn(
     out_t = time.perf_counter()
     timer.mark("outbuf", out_t)
     emit(make_stage("outbuf", timer.marks["outbuf"]).to_json())
-    emit(make_hud(HudState.idle).to_json())
+    if pending is None:
+        emit(make_hud(HudState.idle).to_json())
+    timer.marks["pending_utterance"] = 1.0 if pending else 0.0
     return timer.marks
 
 

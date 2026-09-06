@@ -58,9 +58,14 @@ def main(argv: list[str] | None = None) -> int:
     if args.predictions:
         preds = json.loads(args.predictions)
         pairs = list(zip(preds, [f.expected for f in DEFAULT_FIXTURES], strict=True))
-        acc = accuracy(pairs)
-        print(f"accuracy={acc:.3f} n={len(pairs)}")
-    return 0
+    else:
+        from brain.router import route
+
+        pairs = [(route(f.prompt).name, f.expected) for f in DEFAULT_FIXTURES]
+        print("using brain.router")
+    acc = accuracy(pairs)
+    print(f"accuracy={acc:.3f} n={len(pairs)}")
+    return 0 if acc == 1.0 else 1
 
 
 if __name__ == "__main__":

@@ -8,7 +8,7 @@ import httpx
 
 BRAIN_URL = "http://127.0.0.1:8742"
 
-Kind = Literal["ttft", "clause", "token"]
+Kind = Literal["ttft", "clause", "token", "confirm"]
 
 
 class BrainClient:
@@ -21,10 +21,13 @@ class BrainClient:
             res.raise_for_status()
             return res.json()
 
-    async def stream_chat(self, user_text: str) -> AsyncIterator[tuple[Kind, str]]:
+    async def stream_chat(
+        self, user_text: str, *, confirmed: bool = False
+    ) -> AsyncIterator[tuple[Kind, str]]:
         payload = {
             "messages": [{"role": "user", "content": user_text}],
             "stream": True,
+            "confirmed": confirmed,
         }
         async with httpx.AsyncClient(timeout=120.0) as client:
             async with client.stream(
@@ -41,6 +44,9 @@ class BrainClient:
                         continue
                     if line.startswith(": x-clause "):
                         yield "clause", json.loads(line[len(": x-clause ") :])
+                        continue
+                    if line.startswith(": confirm "):
+                        yield "confirm", line[len(": confirm ") :]
                         continue
                     if not line.startswith("data: "):
                         continue

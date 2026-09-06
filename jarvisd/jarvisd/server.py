@@ -20,7 +20,7 @@ class Session:
         self.ws = ws
         self.brain = BrainClient()
         self.tts = ClauseTts()
-        self.pending_confirm: dict[str, Any] | None = None
+        self.pending_utterance: str | None = None
 
     async def send(self, payload: dict[str, Any]) -> None:
         await self.ws.send(json.dumps(payload))
@@ -34,8 +34,22 @@ class Session:
         if msg["t"] == "hotkey" and msg.get("name") == "ptt_down":
             await self.send(make_hud(HudState.listening).to_json())
             return
+        if msg["t"] == "confirm" and msg.get("ok") and self.pending_utterance:
+            events: list[dict[str, Any]] = []
+
+            def emit(payload: dict[str, Any], bucket: list[dict[str, Any]] = events) -> None:
+                bucket.append(payload)
+
+            await run_text_turn(
+                self.pending_utterance, self.brain, self.tts, emit, confirmed=True
+            )
+            self.pending_utterance = None
+            for ev in events:
+                await self.send(ev)
+            return
         if msg["t"] == "confirm":
-            self.pending_confirm = msg
+            self.pending_utterance = None
+            await self.send(make_hud(HudState.idle).to_json())
             return
 
 
@@ -51,6 +65,7 @@ async def handler(ws: ServerConnection) -> None:
             def emit(payload: dict[str, Any], bucket: list[dict[str, Any]] = events) -> None:
                 bucket.append(payload)
 
+            session.pending_utterance = data["text"]
             await run_text_turn(data["text"], session.brain, session.tts, emit)
             for ev in events:
                 await session.send(ev)

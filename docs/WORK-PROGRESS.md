@@ -2,16 +2,14 @@
 
 ## 2026-09-06
 
-- Ingested spec; wrote master plan; locked v1 (computer only) and v2 backlog.
-- **Implemented v1** on branch `v1`:
-  - Phase 0: Python 3.12, uv workspace, benches, `AGENTS.md`
-  - Phase 1: `KvStore` cap 16384, oldest-turn eviction, `/v1/health`
-  - Phase 2: clause split, prefix cache, SSE `x-clause` + echo LLM (`JARVIS_LLM=mlx` hook)
-  - Phase 3: GBNF + tool loop (max 3, reject unknown names)
-  - Phase 4: bitemporal memory, rerank cap 30
-  - Phase 5: jarvisd WS/protocol, 200 ms EOT, clause TTS starter (Kokoro when `JARVIS_TTS=kokoro`)
-  - Phase 6: Swift HUD/host sources (open in Xcode; Developer ID not applied here)
-  - Phase 7: four tools `memory` `desktop` `browser` `calendar` + confirm gates
-  - Phase 8: launchd agent plists + `wired_limit.sh` (no Home Assistant)
-- Tests: `uv run pytest -q` — 20 passed.
-- Not on this machine yet: Qwen weights, Parakeet/Kokoro/Pipecat extras, Peekaboo AX, Playwright browser, Developer ID signature.
+- v1 complete enough to use:
+  - Tool router (20/20 bench accuracy) wired into `/v1/chat/completions`
+  - Real macOS host fallback (`open`, osascript volume/calendar) when the app socket is down
+  - AX inspect/act via System Events (Peekaboo if installed)
+  - Browser `goto` via `open` or Playwright
+  - `uv run python -m brain.ask "…"`
+  - Swift package builds (`swift build --product Jarvis`)
+  - Confirm gate for lock/quit/sleep/calendar write
+- Tests: 26 passed. `bench/toolcall.py` accuracy=1.000
+- Still yours to supply: Qwen weights, Developer ID, Peekaboo CLI, Playwright browsers
+- GitHub: https://github.com/lakshmisashank0901/Jarvis

@@ -6,10 +6,12 @@ dependencies = [
     "fastapi>=0.115",
     "uvicorn[standard]>=0.32",
     "memory",
+    "jarvis-mcp",
 ]
 
 [tool.uv.sources]
 memory = { workspace = true }
+jarvis-mcp = { workspace = true }
 
 [build-system]
 requires = ["hatchling"]

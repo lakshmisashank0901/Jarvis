@@ -48,6 +48,7 @@ version = "0.1.0"
 source = { editable = "brain" }
 dependencies = [
     { name = "fastapi" },
+    { name = "jarvis-mcp" },
     { name = "memory" },
     { name = "uvicorn", extra = ["standard"] },
 ]
@@ -55,6 +56,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "fastapi", specifier = ">=0.115" },
+    { name = "jarvis-mcp", editable = "mcp" },
     { name = "memory", editable = "memory" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.32" },
 ]

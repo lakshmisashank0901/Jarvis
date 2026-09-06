@@ -53,7 +53,7 @@ def _rrf(rank_lists: list[list[int]], k: int = 60) -> dict[int, float]:
 
 class Store:
     def __init__(self, path: str | Path = ":memory:") -> None:
-        self.conn = sqlite3.connect(str(path))
+        self.conn = sqlite3.connect(str(path), check_same_thread=False)
         self.conn.row_factory = sqlite3.Row
         schema = SCHEMA_PATH.read_text(encoding="utf-8")
         # fts5 content= table is optional; keep a simple fts if content sync is messy

@@ -1,8 +1,9 @@
+import AppKit
 import SwiftUI
 
 @main
 struct JarvisApp: App {
-    @State private var session = JarvisSession()
+    @StateObject private var session = JarvisSession()
 
     var body: some Scene {
         MenuBarExtra("Jarvis", systemImage: "waveform") {
@@ -12,10 +13,4 @@ struct JarvisApp: App {
         }
         .menuBarExtraStyle(.menu)
     }
-
-    init() {
-        session.start()
-    }
 }
-
-import AppKit

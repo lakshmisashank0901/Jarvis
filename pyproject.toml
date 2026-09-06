@@ -18,7 +18,7 @@ dev = [
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["brain/tests", "memory/tests", "jarvisd/tests", "mcp/tests", "bench"]
-pythonpath = ["brain", "memory", "jarvisd", "mcp", "bench"]
+pythonpath = [".", "brain", "memory", "jarvisd", "mcp", "bench"]
 
 [tool.uv]
 package = false

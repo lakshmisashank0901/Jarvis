@@ -23,11 +23,18 @@ class HostClient:
             sock.connect(self.path)
             sock.sendall((json.dumps(payload) + "\n").encode())
             raw = sock.makefile().readline()
-        except OSError as exc:
-            raise HostError(f"host socket unavailable: {self.path}") from exc
-        finally:
             sock.close()
-        data = json.loads(raw)
-        if not data.get("ok"):
-            raise HostError(data.get("error", "host op failed"))
-        return data
+            data = json.loads(raw)
+            if not data.get("ok"):
+                raise HostError(data.get("error", "host op failed"))
+            data["via"] = "app-host"
+            return data
+        except OSError:
+            sock.close()
+            from jarvis_mcp.macos_host import dispatch
+
+            data = dispatch(op, **fields)
+            if not data.get("ok"):
+                raise HostError(str(data.get("error") or "host op failed"))
+            data.setdefault("via", "macos")
+            return data

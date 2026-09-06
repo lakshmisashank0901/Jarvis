@@ -1,11 +1,10 @@
 import Foundation
 
-actor JarvisSocket {
+final class JarvisSocket: @unchecked Sendable {
     static let url = URL(string: "ws://127.0.0.1:8741/v1")!
 
     private var task: URLSessionWebSocketTask?
     var onHUD: (@Sendable (HUDState) -> Void)?
-    var onRaw: (@Sendable (Data) -> Void)?
 
     func start() {
         let session = URLSession(configuration: .default)
@@ -25,18 +24,16 @@ actor JarvisSocket {
         ws.receive { [weak self] result in
             guard let self else { return }
             if case .success(let msg) = result {
-                let data: Data
-                switch msg {
-                case .string(let s): data = Data(s.utf8)
-                case .data(let d): data = d
-                @unknown default: data = Data()
+                let data: Data = switch msg {
+                case .string(let s): Data(s.utf8)
+                case .data(let d): d
+                @unknown default: Data()
                 }
                 if let hud = try? JSONDecoder().decode(HUDState.self, from: data) {
                     self.onHUD?(hud)
                 }
-                self.onRaw?(data)
             }
-            Task { await self.receive(ws) }
+            self.receive(ws)
         }
     }
 }

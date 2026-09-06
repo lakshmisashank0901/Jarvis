@@ -69,8 +69,14 @@ class JarvisMcp:
         gate = self._needs_confirm("desktop", action, arguments)
         if gate:
             return gate
-        if action in {"inspect", "act"}:
-            return {"ok": True, "via": "peekaboo", "action": action, "note": "AX path"}
+        if action == "inspect":
+            from jarvis_mcp.ax import inspect
+
+            return inspect()
+        if action == "act":
+            from jarvis_mcp.ax import act
+
+            return act(str(arguments.get("text") or arguments.get("name") or "OK"))
         op = {
             "open": "app.open",
             "quit": "app.quit",
@@ -91,9 +97,17 @@ class JarvisMcp:
             return {"ok": False, "error": str(exc)}
 
     def _browser(self, action: str | None, arguments: dict[str, Any]) -> dict[str, Any]:
-        if action not in {"goto", "snapshot", "click", "type"}:
-            raise ValueError("browser action must be goto|snapshot|click|type")
-        return {"ok": True, "via": "playwright", "action": action, "args": arguments}
+        from jarvis_mcp import browser as web
+
+        if action == "goto":
+            return web.goto(str(arguments.get("url") or arguments.get("name") or ""))
+        if action == "snapshot":
+            return web.snapshot()
+        if action == "click":
+            return web.click(str(arguments.get("text") or ""))
+        if action == "type":
+            return web.type_text(str(arguments.get("text") or ""))
+        raise ValueError("browser action must be goto|snapshot|click|type")
 
     def _calendar(self, action: str | None, arguments: dict[str, Any]) -> dict[str, Any]:
         if action is None:
