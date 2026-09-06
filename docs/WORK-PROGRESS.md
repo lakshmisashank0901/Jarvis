@@ -26,4 +26,13 @@
 - Compound “open Safari and click Compose” was only `open`. Now `route_steps` runs open, then click.
 - Hybrids only split on click, so “open safari and set volume to 100” was volume only. Split any command chain (`and` / `then`).
 - Hybrid chains now cover every v1 verb, plus `,` `;` `.` `also` `plus`. Facts with “and” stay one step.
+- Intent layer: polite/synonym normalize; `open X` is an app if installed, otherwise a site (Hotstar → browser).
+- “What are my events today” was inspect. Calendar list now matches events/agenda.
+- Conversation path: `mlx-lm` + Qwen3.5-9B 4-bit under `~/.jarvis/models`. Model speaks / calls tools / asks; router is echo fallback only.
+- Qwen3.5-9B 4-bit (~4.7 GB) is on disk. Restart `./ops/run-v1.sh` so `JARVIS_LLM=mlx`.
+- Open failed: model sent `target` not `name`. Desktop maps target/app/application → name.
+- Close-all dumped truncated JSON (`close` + invented apps). Parse speak from broken JSON; `close`/`except` quits running apps and keeps named + Finder.
+- “open youtube” asked forever. Converse now resolves known sites (and follow-ups like “web browser”) to `browser.goto` before the model can ask.
+- “open youtube, discord, instagram, linkedin” was glued into one fake domain. Known-site lists now split into separate `browser.goto` calls.
+- Space-separated “open youtube discord instagram linkedin” was still one fake domain. Consecutive known sites now each get `open` in the default browser.
 - Fixed `run-v1.sh`: `jarvisd` was not on PYTHONPATH (`No module named jarvisd.server`).

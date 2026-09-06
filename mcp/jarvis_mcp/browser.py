@@ -17,23 +17,20 @@ def _normalize_url(url: str) -> str:
 
 def goto(url: str) -> dict[str, Any]:
     target = _normalize_url(url)
-    try:
-        from playwright.sync_api import sync_playwright
-    except ImportError:
-        proc = subprocess.run(["open", target], check=False, capture_output=True, text=True)
-        return {
-            "ok": proc.returncode == 0,
-            "via": "open",
-            "url": target,
-            "error": proc.stderr.strip() or None,
-        }
-    with sync_playwright() as p:
-        browser = p.chromium.launch(headless=False)
-        page = browser.new_page()
-        page.goto(target)
-        title = page.title()
-        # leave the window open
-        return {"ok": True, "via": "playwright", "url": target, "title": title}
+    proc = subprocess.run(
+        ["open", target],
+        check=False,
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    return {
+        "ok": proc.returncode == 0,
+        "via": "open",
+        "url": target,
+        "error": proc.stderr.strip() or None,
+    }
 
 
 def snapshot() -> dict[str, Any]:

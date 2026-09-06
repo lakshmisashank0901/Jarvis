@@ -5,6 +5,8 @@ import time
 from pathlib import Path
 from typing import Any
 
+from brain.converse import available as converse_available
+from brain.converse import run_converse
 from brain.router import ToolCall, route_steps
 from jarvis_mcp.server import JarvisMcp
 from memory.store import Store
@@ -45,7 +47,16 @@ def speak(call: ToolCall, result: dict[str, Any]) -> str:
     if call.name == "browser" and action == "goto":
         return f"Opened {result.get('url') or 'the page'}."
     if call.name == "calendar" and action == "list":
-        return str(result.get("events") or "No events.")[:240]
+        events = result.get("events")
+        if isinstance(events, list):
+            titles = [
+                str(ev.get("title") or ev.get("summary") or "")
+                for ev in events
+                if isinstance(ev, dict)
+            ]
+            text = ", ".join(t for t in titles if t)
+            return (text or "No events today.")[:240]
+        return str(events or "No events.")[:240]
     if call.name == "calendar" and action == "create":
         return f"Added {call.arguments.get('title')} to the calendar."
     return "Done."
@@ -73,6 +84,8 @@ def run_user_turn(
     *,
     confirmed: bool = False,
 ) -> dict[str, Any]:
+    if converse_available():
+        return run_converse(text, mcp, confirmed=confirmed)
     steps = route_steps(text)
     spoken_parts: list[str] = []
     args: dict[str, Any] = {}

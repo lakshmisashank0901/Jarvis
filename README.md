@@ -50,8 +50,8 @@ Type in the Jarvis window. Green = brain connected. No microphone yet.
 
 ## Models
 
-Default `JARVIS_LLM=echo` plus a rule router (20/20 fixture accuracy). For real Qwen:
+If `~/.jarvis/models/Qwen3.5-9B-4bit` is present, `./ops/run-v1.sh` sets `JARVIS_LLM=mlx` and the model replies in natural language, calls tools, or asks when unsure.
 
-`JARVIS_LLM=mlx JARVIS_MLX_MODEL=/path/to/qwen-4bit`
+Otherwise: `JARVIS_LLM=echo` plus the rule router (20/20 fixture accuracy).
 
 v2 (WhatsApp, wake word, FaceTime, …) is not this branch.

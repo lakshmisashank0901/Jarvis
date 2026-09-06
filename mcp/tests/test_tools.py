@@ -15,12 +15,57 @@ def test_exactly_four_tool_names() -> None:
     assert TOOL_NAMES == ("memory", "desktop", "browser", "calendar")
 
 
+def test_desktop_open_accepts_target_alias() -> None:
+    host = FakeHost()
+    mcp = JarvisMcp(store=Store(), host=host)  # type: ignore[arg-type]
+    out = mcp.call("desktop", {"action": "open", "target": "Safari"})
+    assert out["ok"] is True
+    assert host.calls[0] == ("app.open", {"name": "Safari"})
+
+
 def test_desktop_open_hits_host() -> None:
     host = FakeHost()
     mcp = JarvisMcp(store=Store(), host=host)  # type: ignore[arg-type]
     out = mcp.call("desktop", {"action": "open", "name": "Safari"})
     assert out["ok"] is True
     assert host.calls[0][0] == "app.open"
+
+
+def test_close_all_except_quits_running_keep_named() -> None:
+    class ListingHost(FakeHost):
+        def call(self, op: str, **fields: object) -> dict:
+            self.calls.append((op, fields))
+            if op == "app.list":
+                return {"ok": True, "apps": ["Safari", "Notes", "Cursor", "Music", "Finder"]}
+            return {"ok": True, "op": op, **fields}
+
+    host = ListingHost()
+    mcp = JarvisMcp(store=Store(), host=host)  # type: ignore[arg-type]
+    out = mcp.call(
+        "desktop",
+        {"action": "close", "except": ["Safari", "Cursor"], "confirmed": True},
+    )
+    assert out["ok"] is True
+    quit_names = [f.get("name") for op, f in host.calls if op == "app.quit"]
+    assert quit_names == ["Notes", "Music"]
+
+
+def test_quit_all_except_in_name() -> None:
+    class ListingHost(FakeHost):
+        def call(self, op: str, **fields: object) -> dict:
+            self.calls.append((op, fields))
+            if op == "app.list":
+                return {"ok": True, "apps": ["Safari", "Notes", "Cursor"]}
+            return {"ok": True, "op": op, **fields}
+
+    host = ListingHost()
+    mcp = JarvisMcp(store=Store(), host=host)  # type: ignore[arg-type]
+    mcp.call(
+        "desktop",
+        {"action": "quit", "name": "all apps except safari and cursor", "confirmed": True},
+    )
+    quit_names = [f.get("name") for op, f in host.calls if op == "app.quit"]
+    assert quit_names == ["Notes"]
 
 
 def test_quit_and_calendar_create_need_confirm() -> None:

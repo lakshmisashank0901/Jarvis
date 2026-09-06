@@ -1,7 +1,15 @@
 #!/bin/zsh
 set -euo pipefail
 cd "$(dirname "$0")/.."
-export JARVIS_LLM="${JARVIS_LLM:-echo}"
+MODEL_DIR="${JARVIS_MLX_MODEL:-$HOME/.jarvis/models/Qwen3.5-9B-4bit}"
+WEIGHTS="$MODEL_DIR/model.safetensors"
+SIZE=$(stat -f%z "$WEIGHTS" 2>/dev/null || echo 0)
+if [[ -f "$MODEL_DIR/config.json" && -f "$WEIGHTS" && "$SIZE" -gt 1000000000 ]]; then
+  export JARVIS_LLM="${JARVIS_LLM:-mlx}"
+  export JARVIS_MLX_MODEL="$MODEL_DIR"
+else
+  export JARVIS_LLM="${JARVIS_LLM:-echo}"
+fi
 export PYTHONPATH="$PWD/brain:$PWD/jarvisd:$PWD/mcp:$PWD/memory${PYTHONPATH:+:$PYTHONPATH}"
 if [[ ! -x .venv/bin/python ]]; then
   echo "run: uv sync --all-packages" >&2

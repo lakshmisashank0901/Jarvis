@@ -5,6 +5,8 @@ from dataclasses import dataclass
 from typing import Any
 from urllib.parse import urlparse
 
+from brain.understand import app_exists, looks_like_site, normalize, site_url
+
 
 @dataclass(frozen=True)
 class ToolCall:
@@ -78,7 +80,7 @@ def _clauses(text: str) -> list[str]:
 
 
 def route_steps(text: str) -> list[ToolCall]:
-    raw = text.strip()
+    raw = normalize(text.strip())
     parts = _clauses(raw)
     if len(parts) <= 1:
         return [route(raw)]
@@ -94,7 +96,7 @@ def route_steps(text: str) -> list[ToolCall]:
 
 
 def route(text: str) -> ToolCall:
-    raw = text.strip()
+    raw = normalize(text.strip())
     low = raw.lower()
 
     if _is_browser(low):
@@ -119,12 +121,19 @@ def _is_browser(low: str) -> bool:
 
 
 def _is_calendar(low: str) -> bool:
+    if "on this screen" in low:
+        return False
     keys = (
         "calendar",
+        "agenda",
+        "events",
+        "my event",
         "book 30",
         "book thirty",
         "meeting",
         "standup",
+        "event today",
+        "event tomorrow",
         "event friday",
         "event saturday",
         "event sunday",
@@ -172,7 +181,8 @@ def _calendar(raw: str, low: str) -> ToolCall:
             "calendar",
             {"action": "update", "title": _event_title(raw), "confirm_text": raw},
         )
-    return ToolCall("calendar", {"action": "list"})
+    start, end = _day_window(low)
+    return ToolCall("calendar", {"action": "list", "from": start, "to": end})
 
 
 def _memory(raw: str, low: str) -> ToolCall:
@@ -220,6 +230,10 @@ def _desktop(raw: str, low: str) -> ToolCall:
         name = raw[5:].strip()
         if name.lower().startswith("the "):
             name = name[4:]
+        if name.lower() not in {"browser", "the browser"} and (
+            looks_like_site(name) or not app_exists(name)
+        ):
+            return ToolCall("browser", {"action": "goto", "url": site_url(name)})
         return ToolCall("desktop", {"action": "open", "name": name})
     return ToolCall("desktop", {"action": "inspect"})
 
@@ -265,6 +279,24 @@ def _after(low: str, word: str) -> str:
 def _path(raw: str) -> str:
     m = re.search(r"((?:~|/)\S+)", raw)
     return m.group(1) if m else raw.split()[-1]
+
+
+def _day_window(low: str) -> tuple[str, str]:
+    from datetime import datetime, timedelta
+
+    start = datetime.now().astimezone().replace(hour=0, minute=0, second=0, microsecond=0)
+    if "tomorrow" in low:
+        start += timedelta(days=1)
+    end = start + timedelta(days=1)
+    return _iso_local(start), _iso_local(end)
+
+
+def _iso_local(dt: object) -> str:
+    raw = dt.strftime("%Y-%m-%dT%H:%M:%S")  # type: ignore[attr-defined]
+    off = dt.strftime("%z")  # type: ignore[attr-defined]
+    if off:
+        return f"{raw}{off[:3]}:{off[3:]}"
+    return raw
 
 
 def _event_title(raw: str) -> str:

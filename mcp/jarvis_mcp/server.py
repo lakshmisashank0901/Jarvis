@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from typing import Any
 
 from jarvis_mcp.host_client import HostClient, HostError
@@ -8,8 +9,30 @@ from memory.store import Store
 
 TOOL_NAMES = ("memory", "desktop", "browser", "calendar")
 
-CONFIRM_DESKTOP = {"quit", "lock", "sleep", "act"}
+CONFIRM_DESKTOP = {"quit", "close", "lock", "sleep", "act"}
 CONFIRM_CALENDAR = {"create", "update"}
+_PROTECTED = {
+    "finder",
+    "dock",
+    "systemuiserver",
+    "control center",
+    "notification center",
+    "loginwindow",
+    "windowserver",
+    "jarvis",
+    "spotlight",
+}
+_EXCEPT = re.compile(r"except\s+(.+)", re.I)
+
+
+def _split_keep(text: str) -> list[str]:
+    match = _EXCEPT.search(text)
+    rest = match.group(1) if match else ""
+    return [
+        part.strip()
+        for part in re.split(r"\s+and\s+|,\s*", rest)
+        if part.strip() and part.strip().lower() not in {"the", "app", "apps"}
+    ]
 
 
 class JarvisMcp:
@@ -64,9 +87,51 @@ class JarvisMcp:
             }
         return None
 
+    def _keep_list(self, arguments: dict[str, Any]) -> list[str] | None:
+        raw = arguments.get("except")
+        if raw is None:
+            raw = arguments.get("keep")
+        if raw is not None:
+            if isinstance(raw, list):
+                return [str(x) for x in raw if str(x).strip()]
+            return _split_keep(str(raw))
+        name = str(arguments.get("name") or arguments.get("target") or "")
+        low = name.lower()
+        if "except" in low or low in {"all", "all apps"} or low.startswith("all app"):
+            return _split_keep(name)
+        return None
+
+    def _quit_except(self, keep: list[str]) -> dict[str, Any]:
+        keep_l = {k.lower() for k in keep} | _PROTECTED
+        try:
+            listed = self.host.call("app.list")
+        except HostError as exc:
+            return {"ok": False, "error": str(exc)}
+        apps = listed.get("apps") if isinstance(listed.get("apps"), list) else []
+        quit: list[str] = []
+        for name in apps:
+            label = str(name)
+            if label.lower() in keep_l:
+                continue
+            try:
+                self.host.call("app.quit", name=label)
+                quit.append(label)
+            except HostError:
+                continue
+        return {"ok": True, "quit": quit, "kept": [str(a) for a in apps if str(a).lower() in keep_l]}
+
     def _desktop(self, action: str | None, arguments: dict[str, Any]) -> dict[str, Any]:
         if action is None:
             raise ValueError("desktop action required")
+        if action == "close":
+            action = "quit"
+            arguments = {**arguments, "action": "quit"}
+        keep = self._keep_list(arguments) if action == "quit" else None
+        if keep is not None:
+            gate = self._needs_confirm("desktop", "quit", arguments)
+            if gate:
+                return gate
+            return self._quit_except(keep)
         gate = self._needs_confirm("desktop", action, arguments)
         if gate:
             return gate
@@ -98,6 +163,10 @@ class JarvisMcp:
         if not op:
             raise ValueError(f"unknown desktop action {action}")
         fields = {k: v for k, v in arguments.items() if k not in {"action", "confirmed", "confirm_text", "irreversible"}}
+        if action in {"open", "quit", "focus"}:
+            app = fields.get("name") or fields.get("target") or fields.get("app") or fields.get("application")
+            if app:
+                fields = {"name": app, **{k: v for k, v in fields.items() if k not in {"name", "target", "app", "application"}}}
         try:
             result = self.host.call(op, **fields)
         except HostError as exc:

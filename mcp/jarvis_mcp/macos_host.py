@@ -32,6 +32,14 @@ def dispatch(op: str, **fields: Any) -> dict[str, Any]:
                 f'tell application "System Events" to tell process "{target}" to quit'
             )
         return {"ok": proc.returncode == 0, "name": str(target), "error": proc.stderr.strip() or None}
+    if op == "app.list":
+        proc = _osa(
+            'tell application "System Events" to get name of every process whose background only is false'
+        )
+        if proc.returncode != 0:
+            return {"ok": False, "error": proc.stderr.strip() or "list failed"}
+        apps = [p.strip() for p in proc.stdout.replace("{", "").replace("}", "").split(",") if p.strip()]
+        return {"ok": True, "apps": apps}
     if op == "app.focus":
         target = fields.get("name") or fields.get("bundle_id")
         proc = _osa(f'tell application "{target}" to activate')
