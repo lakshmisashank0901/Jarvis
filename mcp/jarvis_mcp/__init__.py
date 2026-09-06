@@ -1,0 +1,1 @@
+"""Jarvis MCP — four tools."""

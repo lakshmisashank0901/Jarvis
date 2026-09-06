@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleName</key>
+    <string>Jarvis</string>
+    <key>CFBundleIdentifier</key>
+    <string>com.jarvis.app</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>LSUIElement</key>
+    <true/>
+    <key>NSCalendarsFullAccessUsageDescription</key>
+    <string>Jarvis reads and writes your calendar when you ask.</string>
+    <key>NSAppleEventsUsageDescription</key>
+    <string>Jarvis adjusts volume and opens apps you name.</string>
+    <key>NSAccessibilityUsageDescription</key>
+    <string>Jarvis reads the front app so it can click and type for you.</string>
+</dict>
+</plist>

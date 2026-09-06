@@ -1,0 +1,124 @@
+from __future__ import annotations
+
+import json
+from typing import Any
+
+from jarvis_mcp.host_client import HostClient, HostError
+from memory.store import Store
+
+TOOL_NAMES = ("memory", "desktop", "browser", "calendar")
+
+CONFIRM_DESKTOP = {"quit", "lock", "sleep", "act"}
+CONFIRM_CALENDAR = {"create", "update"}
+
+
+class JarvisMcp:
+    def __init__(self, store: Store | None = None, host: HostClient | None = None) -> None:
+        self.store = store or Store()
+        self.host = host or HostClient()
+        self.last_confirm: dict[str, Any] | None = None
+
+    def tools(self) -> list[str]:
+        return list(TOOL_NAMES)
+
+    def call(self, name: str, arguments: dict[str, Any]) -> dict[str, Any]:
+        if name not in TOOL_NAMES:
+            raise ValueError(f"unknown tool {name}")
+        action = arguments.get("action")
+        if name == "memory":
+            return self._memory(action, arguments)
+        if name == "desktop":
+            return self._desktop(action, arguments)
+        if name == "browser":
+            return self._browser(action, arguments)
+        return self._calendar(action, arguments)
+
+    def _memory(self, action: str | None, arguments: dict[str, Any]) -> dict[str, Any]:
+        from datetime import datetime, timezone
+
+        now = datetime.now(timezone.utc)
+        if action == "search":
+            hits = self.store.search(str(arguments.get("query", "")), k=int(arguments.get("k", 20)))
+            return {"ok": True, "facts": [h.fact for h in hits]}
+        if action == "remember":
+            fact = str(arguments.get("fact", ""))
+            self.store.remember(fact, now, now, subject=arguments.get("subject"))
+            return {"ok": True}
+        raise ValueError("memory action must be search|remember")
+
+    def _needs_confirm(self, tool: str, action: str, arguments: dict[str, Any]) -> dict[str, Any] | None:
+        if arguments.get("confirmed") is True:
+            return None
+        if tool == "desktop" and action in CONFIRM_DESKTOP:
+            if action == "act" and not arguments.get("irreversible", True):
+                return None
+            return {
+                "needs_confirm": True,
+                "text": arguments.get("confirm_text") or f"{action} on the Mac",
+            }
+        if tool == "calendar" and action in CONFIRM_CALENDAR:
+            return {
+                "needs_confirm": True,
+                "text": arguments.get("confirm_text") or f"calendar {action}",
+            }
+        return None
+
+    def _desktop(self, action: str | None, arguments: dict[str, Any]) -> dict[str, Any]:
+        if action is None:
+            raise ValueError("desktop action required")
+        gate = self._needs_confirm("desktop", action, arguments)
+        if gate:
+            return gate
+        if action in {"inspect", "act"}:
+            return {"ok": True, "via": "peekaboo", "action": action, "note": "AX path"}
+        op = {
+            "open": "app.open",
+            "quit": "app.quit",
+            "focus": "app.focus",
+            "files_open": "files.open",
+            "files_reveal": "files.reveal",
+            "volume": "system.volume",
+            "mute": "system.mute",
+            "lock": "system.lock",
+            "sleep": "system.sleep",
+        }.get(action)
+        if not op:
+            raise ValueError(f"unknown desktop action {action}")
+        fields = {k: v for k, v in arguments.items() if k not in {"action", "confirmed", "confirm_text", "irreversible"}}
+        try:
+            return self.host.call(op, **fields)
+        except HostError as exc:
+            return {"ok": False, "error": str(exc)}
+
+    def _browser(self, action: str | None, arguments: dict[str, Any]) -> dict[str, Any]:
+        if action not in {"goto", "snapshot", "click", "type"}:
+            raise ValueError("browser action must be goto|snapshot|click|type")
+        return {"ok": True, "via": "playwright", "action": action, "args": arguments}
+
+    def _calendar(self, action: str | None, arguments: dict[str, Any]) -> dict[str, Any]:
+        if action is None:
+            raise ValueError("calendar action required")
+        gate = self._needs_confirm("calendar", action, arguments)
+        if gate:
+            return gate
+        op = {
+            "list": "calendar.list",
+            "create": "calendar.create",
+            "update": "calendar.update",
+        }.get(action)
+        if not op:
+            raise ValueError(f"unknown calendar action {action}")
+        fields = {k: v for k, v in arguments.items() if k not in {"action", "confirmed", "confirm_text"}}
+        try:
+            return self.host.call(op, **fields)
+        except HostError as exc:
+            return {"ok": False, "error": str(exc)}
+
+
+def stdio_loop() -> None:
+    mcp = JarvisMcp()
+    print(json.dumps({"tools": list(TOOL_NAMES)}), flush=True)
+
+
+if __name__ == "__main__":
+    stdio_loop()
